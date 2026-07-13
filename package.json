@@ -1,0 +1,16 @@
+{
+  "name": "itwasher",
+  "version": "1.0.0",
+  "description": "ITWasher — Audit et durcissement de la vie privée et de la sécurité sous Windows",
+  "main": "src/main.js",
+  "author": "ITWasher",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-packager . ITWasher --platform=win32 --arch=x64 --icon=build/icon.ico --out=dist --overwrite --app-version=1.0.0 --win32metadata.CompanyName=ITWasher --win32metadata.FileDescription=\"ITWasher - Audit vie privee Windows\" --win32metadata.ProductName=ITWasher --ignore=\"(^/dist$|^/build/icon.png$|\\.md$)\""
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.0.2",
+    "electron": "^30.0.0"
+  }
+}

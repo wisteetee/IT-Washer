@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- script-src reste strict ('self' uniquement) : c'est la protection clé.
+       style-src autorise 'unsafe-inline' car l'UI est générée par notre propre code
+       (jamais de HTML externe non échappé) et utilise beaucoup de styles inline
+       dynamiques (graphiques, couleurs de score). connect-src 'none' : aucune
+       requête réseau depuis le renderer (les appels passent par le process principal). -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none';" />
+  <title>ITWasher</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Rail de navigation -->
+    <nav id="rail">
+      <div class="brand">
+        <div class="brand-mark">◈</div>
+        <div class="brand-txt">
+          <span class="brand-name">ITWASHER</span>
+          <span class="brand-sub">hygiène informatique</span>
+        </div>
+      </div>
+      <ul id="nav">
+        <li data-view="dashboard" class="active"><span class="ico">▤</span> Tableau de bord</li>
+        <li data-view="profiles"><span class="ico">◈</span> Profils</li>
+        <li data-view="telemetry"><span class="ico">◉</span> Télémétrie Windows</li>
+        <li data-view="windows11"><span class="ico">⊞</span> Nouveautés Windows 11</li>
+        <li data-view="apps"><span class="ico">▦</span> Applications</li>
+        <li data-view="startup"><span class="ico">⚙</span> Démarrage &amp; services</li>
+        <li data-view="browsers"><span class="ico">◐</span> Navigateurs &amp; consentements</li>
+        <li data-view="breaches"><span class="ico">⚠</span> Fuites de données</li>
+        <li data-view="exif"><span class="ico">◫</span> Métadonnées photos</li>
+        <li data-view="network"><span class="ico">⇄</span> Réseau &amp; sécurité</li>
+        <li data-view="accounts"><span class="ico">◔</span> Comptes Windows</li>
+        <li data-view="history"><span class="ico">◷</span> Historique</li>
+        <li data-view="journal"><span class="ico">↺</span> Journal &amp; annulation</li>
+      </ul>
+      <div class="rail-foot">
+        <button id="scanAll" class="btn btn-accent">▶ Tout auditer</button>
+        <p class="disclaimer">Aucune modification n'est appliquée sans ta confirmation.</p>
+      </div>
+    </nav>
+
+    <!-- Zone principale -->
+    <main id="main">
+      <div id="view-container"></div>
+    </main>
+  </div>
+
+  <!-- Modale de confirmation d'action -->
+  <div id="modal" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3 id="modal-title">Confirmer l'action</h3>
+      <p id="modal-desc"></p>
+      <div class="modal-script-wrap">
+        <div class="modal-script-label">Commande PowerShell qui sera exécutée :</div>
+        <pre id="modal-script"></pre>
+      </div>
+      <div id="modal-elevation" class="modal-elevation hidden">
+        <span class="shield">🛡</span> Une élévation administrateur (UAC) sera demandée.
+      </div>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn">Annuler</button>
+        <button id="modal-confirm" class="btn btn-accent">Appliquer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

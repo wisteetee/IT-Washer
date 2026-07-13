@@ -1,0 +1,25 @@
+# Dépendances (régénérables via npm install)
+node_modules/
+
+# Sortie de build (régénérable via npm run dist) — ~255 Mo, ne pas versionner
+dist/
+
+# Artefacts de test / diagnostic
+*_result.txt
+test_*.js
+diag_*.js
+*.tmp
+
+# Données locales de l'app (générées à l'exécution)
+score-history.json
+rollback-journal.json
+prefs.json
+
+# Raccourcis Windows
+*.lnk
+
+# OS / éditeurs
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
