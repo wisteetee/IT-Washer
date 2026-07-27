@@ -33,6 +33,8 @@ Génère un dossier autonome `dist/ITWasher-win32-x64/` contenant `ITWasher.exe`
 | Module | Ce qu'il fait |
 |--------|---------------|
 | **Tableau de bord** | Score d'hygiène global (analyse déclenchée par bouton) + vue par domaine + export du rapport. |
+| **Centre de démarches** | 14 parcours guidés (RGPD, effacement de comptes, anti-démarchage, opt-out publicité) avec bouton « Commencer » vers les portails officiels et suivi de progression. |
+| **Blocage de publicités** | Bloque pubs et traqueurs pour toutes les apps via le fichier hosts (liste reconnue, réversible) + guide d'extensions navigateur. |
 | **Profils** | Applique un ensemble cohérent de réglages en un clic : Basique / Équilibré / Parano. |
 | **Télémétrie Windows** | Durcit : niveau de télémétrie, ID publicitaire, historique d'activités, Cortana, pubs Démarrer, suivi d'usage, localisation, Wi-Fi Sense. Réversible. |
 | **Nouveautés Windows 11** | Recall (capture IA), Copilot, Widgets, presse-papiers cloud/historique. |

@@ -53,12 +53,14 @@ function confirmAction({ title, desc, script, elevated }) {
 // ---------- Navigation ----------
 const views = {
   dashboard: renderDashboard,
+  procedures: renderProcedures,
   profiles: renderProfiles,
   telemetry: renderTelemetry,
   windows11: renderWindows11,
   apps: renderApps,
   startup: renderStartup,
   browsers: renderBrowsers,
+  adblock: renderAdblock,
   breaches: renderBreaches,
   exif: renderExif,
   network: renderNetwork,
@@ -1220,6 +1222,160 @@ async function renderSchedule() {
     const res = await window.api.schedule.remove();
     toast(res.ok ? 'Surveillance désactivée ✓' : 'Échec : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
     if (res.ok) renderSchedule();
+  };
+}
+
+// ---------- Vue : Centre de démarches ----------
+async function renderProcedures() {
+  container.innerHTML = `
+    <div class="view-head">
+      <span class="eyebrow">Reprendre le contrôle</span>
+      <h1>Centre de démarches</h1>
+      <p>Des actions concrètes pour reprendre la main sur tes données, tes comptes et ta tranquillité. Chacune s'effectue sur un portail officiel, en quelques minutes. Coche au fur et à mesure.</p>
+    </div>
+    <div id="proc-body">${loading('Chargement des démarches…')}</div>`;
+
+  const data = await window.api.procedures.list();
+  const body = document.getElementById('proc-body');
+
+  const impactColor = { low: 'var(--text-faint)', medium: 'var(--warn)', high: 'var(--accent)' };
+  const impactLabel = { low: 'impact utile', medium: 'impact notable', high: 'impact fort' };
+  const pct = data.total ? Math.round((data.done / data.total) * 100) : 0;
+  const circ = 2 * Math.PI * 34;
+
+  // Bloc de progression global (motivation).
+  const progressHero = `
+    <div class="score-hero" style="padding:20px 26px;margin-bottom:22px;align-items:center">
+      <div class="gauge" style="width:82px;height:82px">
+        <svg width="82" height="82" viewBox="0 0 82 82">
+          <circle cx="41" cy="41" r="34" fill="none" stroke="var(--line)" stroke-width="7"/>
+          <circle cx="41" cy="41" r="34" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"
+            stroke-dasharray="${circ * (pct/100)} ${circ}" transform="rotate(-90 41 41)"/>
+        </svg>
+        <div class="gauge-num"><b style="font-size:20px">${data.done}</b><small style="font-size:8px">/ ${data.total}</small></div>
+      </div>
+      <div class="score-txt">
+        <h2>${pct === 100 ? 'Bravo, tout est fait ! 🎉' : (data.done === 0 ? 'Prêt à reprendre le contrôle ?' : `Déjà ${data.done} démarche(s) accomplie(s)`)}</h2>
+        <p>${pct === 100 ? 'Tu as complété toutes les démarches proposées. Pense à y revenir dans quelques mois.' : 'Chaque démarche cochée est une brique de reprise de contrôle. Pas besoin de tout faire d\'un coup.'}</p>
+      </div>
+    </div>`;
+
+  // Démarches groupées par catégorie.
+  const catHtml = data.categories.map((cat) => {
+    const procs = data.procedures.filter((p) => p.cat === cat.id);
+    if (!procs.length) return '';
+    return `
+      <div style="margin-bottom:26px">
+        <span class="eyebrow" style="font-size:12px">${cat.icon} ${esc(cat.label)}</span>
+        ${procs.map((p) => `
+          <div class="proc-card ${p.done ? 'proc-done' : ''}">
+            <div class="proc-check">
+              <label class="chk"><input type="checkbox" data-proc="${esc(p.id)}" ${p.done ? 'checked' : ''}></label>
+            </div>
+            <div class="proc-body">
+              <div class="proc-title">${esc(p.title)}</div>
+              <div class="proc-why">${esc(p.why)}</div>
+              <details class="proc-steps">
+                <summary>Voir les étapes (${p.steps.length})</summary>
+                <ol>${p.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
+              </details>
+              <div class="proc-meta">
+                <span class="pill" style="color:${impactColor[p.impact]}">${impactLabel[p.impact]}</span>
+                <span class="proc-time">⏱ ${esc(p.time)}</span>
+              </div>
+            </div>
+            <div class="proc-cta">
+              <button class="btn btn-accent btn-sm" data-url="${esc(p.url)}">${esc(p.cta || 'Commencer')} →</button>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  }).join('');
+
+  body.innerHTML = progressHero + catHtml;
+
+  // Boutons « Commencer » → ouvre le portail.
+  body.querySelectorAll('[data-url]').forEach((btn) =>
+    btn.addEventListener('click', () => window.api.openExternal(btn.dataset.url)));
+
+  // Cases à cocher → persiste la progression et met à jour l'affichage.
+  body.querySelectorAll('input[data-proc]').forEach((box) => {
+    box.addEventListener('change', async () => {
+      await window.api.procedures.setDone(box.dataset.proc, box.checked);
+      renderProcedures();
+    });
+  });
+}
+
+// ---------- Vue : Blocage de publicités ----------
+async function renderAdblock() {
+  container.innerHTML = `
+    <div class="view-head">
+      <span class="eyebrow">Anti-pub & anti-tracking</span>
+      <h1>Blocage de publicités</h1>
+      <p>Bloque les pubs et traqueurs pour <b>toutes</b> les applications, pas seulement le navigateur, en filtrant les domaines connus au niveau système. Réversible en un clic.</p>
+    </div>
+    <div id="ab-body">${loading('Vérification du blocage…')}</div>`;
+
+  const data = await window.api.audit.adblock();
+  const body = document.getElementById('ab-body');
+
+  body.innerHTML = `
+    <div class="guide">
+      <h3><span style="color:var(--accent)">⊘</span> Blocage au niveau système (fichier hosts)</h3>
+      <div class="g-detail">${data.active
+        ? `Blocage <b style="color:var(--ok)">actif</b> — environ <b>${data.count.toLocaleString('fr-FR')}</b> domaines pub/tracking bloqués pour tout le PC.`
+        : 'Le blocage système n\'est pas actif. Une liste reconnue (StevenBlack, ~90 000 domaines) sera ajoutée à ton fichier hosts.'}</div>
+      <div class="privacy-note" style="margin-bottom:14px"><span>🔒</span><span>Une sauvegarde de ton fichier hosts est créée avant toute modification. Le blocage est délimité par des marqueurs ITWasher et retiré proprement si tu le désactives.</span></div>
+      ${data.active
+        ? `<button class="btn btn-sm" id="ab-remove">Désactiver le blocage système</button>
+           <button class="btn btn-sm btn-accent" id="ab-apply" style="margin-left:8px">Mettre à jour la liste</button>`
+        : `<button class="btn btn-accent btn-sm" id="ab-apply">Activer le blocage système (admin)</button>`}
+    </div>
+
+    <span class="eyebrow">Côté navigateur (recommandé en complément)</span>
+    ${data.tools.map((t) => `
+      <div class="check">
+        <div class="check-status s-ok"></div>
+        <div class="check-body">
+          <div class="check-title">${esc(t.name)}</div>
+          <div class="check-detail">${esc(t.detail)}</div>
+        </div>
+        <div class="check-side">
+          <button class="btn btn-sm" data-url="${esc(t.url)}">Découvrir →</button>
+        </div>
+      </div>`).join('')}`;
+
+  body.querySelectorAll('[data-url]').forEach((btn) =>
+    btn.addEventListener('click', () => window.api.openExternal(btn.dataset.url)));
+
+  const applyBtn = body.querySelector('#ab-apply');
+  if (applyBtn) applyBtn.onclick = async () => {
+    const go = await confirmAction({
+      title: data.active ? 'Mettre à jour la liste de blocage' : 'Activer le blocage de publicités',
+      desc: 'La liste StevenBlack (~90 000 domaines pub/tracking) sera téléchargée et ajoutée à ton fichier hosts Windows. Une sauvegarde est faite avant. Droits admin requis.',
+      script: 'Télécharge la liste → sauvegarde hosts → ajoute la section ITWasher → vide le cache DNS.',
+      elevated: true,
+    });
+    if (!go) return;
+    toast('Téléchargement et application… (UAC requis)');
+    const res = await window.api.adblock.apply();
+    toast(res.ok ? 'Blocage appliqué ✓' : 'Échec / annulé : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
+    if (res.ok) renderAdblock();
+  };
+
+  const removeBtn = body.querySelector('#ab-remove');
+  if (removeBtn) removeBtn.onclick = async () => {
+    const go = await confirmAction({
+      title: 'Désactiver le blocage système',
+      desc: 'La section anti-pub ITWasher sera retirée de ton fichier hosts. Droits admin requis.',
+      script: 'Retire la section ITWasher du hosts → vide le cache DNS.',
+      elevated: true,
+    });
+    if (!go) return;
+    toast('Retrait… (UAC requis)');
+    const res = await window.api.adblock.remove();
+    toast(res.ok ? 'Blocage désactivé ✓' : 'Échec / annulé : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
+    if (res.ok) renderAdblock();
   };
 }
 

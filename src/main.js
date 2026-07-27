@@ -15,6 +15,8 @@ const exif = require('./modules/exif');
 const homenetwork = require('./modules/homenetwork');
 const snapshot = require('./modules/snapshot');
 const schedule = require('./modules/schedule');
+const procedures = require('./modules/procedures');
+const adblock = require('./modules/adblock');
 const profiles = require('./modules/profiles');
 const restore = require('./restore');
 const rollback = require('./rollback');
@@ -112,7 +114,26 @@ ipcMain.handle('audit:windows11', () => windows11.audit());
 ipcMain.handle('audit:accounts', () => accounts.audit());
 ipcMain.handle('audit:startup', () => startup.audit());
 ipcMain.handle('audit:homenetwork', () => homenetwork.audit());
+ipcMain.handle('audit:adblock', () => adblock.audit());
 ipcMain.handle('restore:status', () => restore.restoreStatus());
+
+// ---- Centre de démarches ----
+ipcMain.handle('procedures:list', () => procedures.list());
+ipcMain.handle('procedures:setDone', (_e, id, done) => procedures.setDone(id, done));
+
+// ---- Blocage de publicités (hosts système) ----
+ipcMain.handle('adblock:apply', async () => {
+  try {
+    const { script } = await adblock.buildApply();
+    return runPowerShellElevated(script);
+  } catch (err) {
+    return { ok: false, stderr: 'Téléchargement de la liste impossible : ' + err.message };
+  }
+});
+ipcMain.handle('adblock:remove', () => {
+  const { script } = adblock.buildRemove();
+  return runPowerShellElevated(script);
+});
 
 // ---- Réseau domestique : test de fuite d'IP + désactivation UPnP ----
 ipcMain.handle('homenetwork:ipLeak', () => homenetwork.ipLeakTest());

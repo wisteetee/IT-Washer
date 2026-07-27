@@ -22,6 +22,10 @@ Légende faisabilité : 🟢 auto fiable · 🟡 auto avec réserves · 🔵 aud
 - **Module Métadonnées photos (EXIF GPS)** — `exif.js`, vue dédiée : scan récursif d'un dossier (System.Drawing), détection GPS, effacement en un clic (réécriture atomique). Scan+strip testés.
 - **Rebranding** — titre fenêtre + brand = ITWasher.
 
+### 4e vague — reprise de contrôle (2026-07-27)
+- **Centre de démarches** (`procedures.js`, vue phare en 2e position du rail) : 14 parcours guidés en 4 catégories (vie privée & données, publicité & tracking, comptes & effacement, anti-démarchage). Chaque démarche = titre motivant, « pourquoi », temps estimé, badge d'impact, étapes repliables, bouton « Commencer » vers un portail officiel vérifié (CNIL, Bloctel, Google/Meta/Microsoft, Utiq, JustDeleteMe, HIBP, Bitwarden…). Suivi de progression persisté (`procedures-progress.json`) avec anneau + messages motivants.
+- **Blocage de publicités** (`adblock.js`, vue dédiée) : blocage niveau système via fichier hosts (liste StevenBlack ~93k domaines, section délimitée par marqueurs, sauvegarde hosts avant modif, réversible, flushdns). + guide navigateur (uBlock Origin, Privacy Badger, Firefox/LibreWolf). URLs et fetch testés.
+
 ### 3e vague (nouveaux modules + UX)
 - **Module Réseau domestique** — `homenetwork.js`, vue dédiée : VPN actif, UPnP/SSDP (désactivable admin), découverte réseau public, ports en écoute exposés, test de fuite d'IP (appel ipify côté Node, IP masquée à l'affichage). Testé (UPnP actif détecté, 20 ports, IP publique récupérée).
 - **Module Diff post-Windows Update** — `snapshot.js`, vue dédiée : capture instantané des réglages télémétrie+win11 + build Windows, comparaison pour détecter les réglages réactivés par une MAJ. Testé (build 25H2/26200, 15 états).

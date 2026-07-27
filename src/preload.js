@@ -12,6 +12,15 @@ contextBridge.exposeInMainWorld('api', {
     accounts: () => ipcRenderer.invoke('audit:accounts'),
     startup: () => ipcRenderer.invoke('audit:startup'),
     homenetwork: () => ipcRenderer.invoke('audit:homenetwork'),
+    adblock: () => ipcRenderer.invoke('audit:adblock'),
+  },
+  procedures: {
+    list: () => ipcRenderer.invoke('procedures:list'),
+    setDone: (id, done) => ipcRenderer.invoke('procedures:setDone', id, done),
+  },
+  adblock: {
+    apply: () => ipcRenderer.invoke('adblock:apply'),
+    remove: () => ipcRenderer.invoke('adblock:remove'),
   },
   homenetwork: {
     ipLeak: () => ipcRenderer.invoke('homenetwork:ipLeak'),
