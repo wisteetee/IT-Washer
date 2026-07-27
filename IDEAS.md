@@ -22,6 +22,13 @@ Légende faisabilité : 🟢 auto fiable · 🟡 auto avec réserves · 🔵 aud
 - **Module Métadonnées photos (EXIF GPS)** — `exif.js`, vue dédiée : scan récursif d'un dossier (System.Drawing), détection GPS, effacement en un clic (réécriture atomique). Scan+strip testés.
 - **Rebranding** — titre fenêtre + brand = ITWasher.
 
+### 3e vague (nouveaux modules + UX)
+- **Module Réseau domestique** — `homenetwork.js`, vue dédiée : VPN actif, UPnP/SSDP (désactivable admin), découverte réseau public, ports en écoute exposés, test de fuite d'IP (appel ipify côté Node, IP masquée à l'affichage). Testé (UPnP actif détecté, 20 ports, IP publique récupérée).
+- **Module Diff post-Windows Update** — `snapshot.js`, vue dédiée : capture instantané des réglages télémétrie+win11 + build Windows, comparaison pour détecter les réglages réactivés par une MAJ. Testé (build 25H2/26200, 15 états).
+- **Module Surveillance planifiée** — `schedule.js`, vue dédiée : tâche planifiée Windows (quotidienne/hebdo/mensuelle) lançant `ITWasher.exe --scan`. Mode `--scan` = audit silencieux sans UI + notification si régression (testé, se ferme proprement).
+- **Tray + notifications** — icône barre système (ouvrir/scanner/quitter), l'app survit à la fermeture de fenêtre si tray actif. Notification Electron en mode --scan.
+- **UX** : filtre de recherche live dans la liste des apps (`.list-filter`), persistance du dernier dossier EXIF (prefs.exifFolder).
+
 Reste à faire ci-dessous.
 
 ---

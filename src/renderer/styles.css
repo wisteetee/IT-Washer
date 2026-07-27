@@ -282,6 +282,15 @@ body {
 .app-table tr:hover td { background: var(--surface); }
 .app-scroll { max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); }
 
+/* Champ de filtre pour les longues listes */
+.list-filter {
+  width: 100%; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 13px; color: var(--text);
+  font-family: var(--sans); font-size: 13px; margin-bottom: 10px;
+}
+.list-filter:focus { outline: none; border-color: var(--accent); }
+.list-filter::placeholder { color: var(--text-faint); }
+
 /* ===== États de chargement ===== */
 .loading { display: flex; align-items: center; gap: 12px; color: var(--text-dim); padding: 40px 0; }
 .spinner {

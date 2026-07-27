@@ -62,7 +62,10 @@ const views = {
   breaches: renderBreaches,
   exif: renderExif,
   network: renderNetwork,
+  homenetwork: renderHomeNetwork,
   accounts: renderAccounts,
+  snapshot: renderSnapshot,
+  schedule: renderSchedule,
   history: renderHistory,
   journal: renderJournal,
 };
@@ -397,14 +400,24 @@ async function renderApps() {
     ${bloatHtml}
     <div style="height:22px"></div>
     <span class="eyebrow">Toutes les applications (${data.totalInstalled})</span>
+    <input type="text" class="list-filter" id="apps-filter" placeholder="🔍 Filtrer par nom ou éditeur…" autocomplete="off">
     <div class="app-scroll">
       <table class="app-table">
         <thead><tr><th>Nom</th><th>Version</th><th>Éditeur</th></tr></thead>
-        <tbody>
-          ${data.installed.map((a) => `<tr><td>${esc(a.name)}</td><td>${esc(a.version)}</td><td>${esc(a.publisher)}</td></tr>`).join('')}
+        <tbody id="apps-tbody">
+          ${data.installed.map((a) => `<tr data-search="${esc((a.name + ' ' + a.publisher).toLowerCase())}"><td>${esc(a.name)}</td><td>${esc(a.version)}</td><td>${esc(a.publisher)}</td></tr>`).join('')}
         </tbody>
       </table>
     </div>`;
+
+  // Filtrage en direct de la liste des applications.
+  const filterInput = body.querySelector('#apps-filter');
+  filterInput.addEventListener('input', () => {
+    const q = filterInput.value.trim().toLowerCase();
+    body.querySelectorAll('#apps-tbody tr').forEach((tr) => {
+      tr.style.display = !q || tr.dataset.search.includes(q) ? '' : 'none';
+    });
+  });
 
   body.querySelectorAll('[data-url]').forEach((btn) =>
     btn.addEventListener('click', () => window.api.openExternal(btn.dataset.url)));
@@ -967,9 +980,14 @@ async function renderExif() {
   const scanBtn = document.getElementById('exif-scan');
   const results = document.getElementById('exif-results');
 
+  // Restaure le dernier dossier analysé (préférence persistée).
+  window.api.prefs.get().then((p) => {
+    if (p && p.exifFolder) { folder = p.exifFolder; folderInput.value = p.exifFolder; scanBtn.disabled = false; }
+  });
+
   document.getElementById('exif-pick').onclick = async () => {
     const picked = await window.api.exif.pickFolder();
-    if (picked) { folder = picked; folderInput.value = picked; scanBtn.disabled = false; }
+    if (picked) { folder = picked; folderInput.value = picked; scanBtn.disabled = false; window.api.prefs.set({ exifFolder: picked }); }
   };
 
   scanBtn.onclick = async () => {
@@ -1022,6 +1040,189 @@ async function renderExif() {
   };
 }
 
+// ---------- Vue : Réseau domestique ----------
+async function renderHomeNetwork() {
+  container.innerHTML = `
+    <div class="view-head">
+      <span class="eyebrow">Exposition réseau</span>
+      <h1>Réseau domestique</h1>
+      <p>VPN, ports exposés, UPnP et test de fuite d'IP. Le test d'IP publique est le seul élément qui contacte un service externe — et uniquement quand tu le déclenches.</p>
+    </div>
+    <div id="hn-body">${loading('Analyse du réseau…')}</div>`;
+
+  const data = await window.api.audit.homenetwork();
+  const body = document.getElementById('hn-body');
+
+  body.innerHTML = `
+    <div class="action-bar">
+      <button class="btn btn-accent btn-sm" id="hn-fix">Corriger la sélection (admin)</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-sm" id="hn-ipleak">🌐 Tester la fuite d'IP</button>
+    </div>
+    <div id="hn-leak"></div>
+    ${data.checks.map((c) => {
+      const dot = c.status === 'ok' ? 's-ok' : c.status === 'info' ? 's-ok' : 's-warn';
+      return `
+      <div class="check">
+        <div class="check-status ${dot}"></div>
+        <div class="check-body">
+          <div class="check-title">${esc(c.label)}</div>
+          <div class="check-detail">${esc(c.detail)}</div>
+          <div class="check-meta"><span><b>État :</b> <span class="${c.status==='ok'?'val-ok':(c.status==='info'?'':'val-current')}">${esc(c.current)}</span></span></div>
+        </div>
+        <div class="check-side">
+          <span class="pill pill-${c.risk}">${c.risk==='high'?'risque élevé':c.risk==='medium'?'risque moyen':'risque faible'}</span>
+          ${c.fixable ? `<label class="chk"><input type="checkbox" data-fix="${esc(c.id)}" checked><span>corriger</span></label>` : (c.status==='warn'?'<span style="color:var(--text-faint);font-size:11px">manuel</span>':'<span style="color:var(--ok);font-size:11.5px">✓ OK</span>')}
+        </div>
+      </div>`;
+    }).join('')}`;
+
+  body.querySelector('#hn-ipleak').onclick = async () => {
+    const leakEl = body.querySelector('#hn-leak');
+    leakEl.innerHTML = loading('Récupération de l\'IP publique…');
+    const r = await window.api.homenetwork.ipLeak();
+    // On masque partiellement l'IP publique par prudence (affichage).
+    const masked = r.publicIp && r.publicIp !== 'Indisponible'
+      ? r.publicIp.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)/, '$1.$2.•••.•••') : r.publicIp;
+    leakEl.innerHTML = `
+      <div class="pw-field" style="margin-bottom:12px">
+        <div class="check-title">Résultat du test de fuite</div>
+        <div class="check-meta" style="margin-top:8px">
+          <span><b>IP publique :</b> <span style="font-family:var(--mono)">${esc(masked)}</span></span>
+          <span><b>VPN :</b> ${r.vpnActive ? '<span style="color:var(--ok)">actif</span>' : '<span style="color:var(--warn)">inactif</span>'}</span>
+        </div>
+        <div class="check-detail" style="margin-top:8px">${r.vpnActive
+          ? 'Un VPN est actif : ton IP réelle est masquée pour les sites que tu visites.'
+          : 'Aucun VPN : ton IP publique ci-dessus est visible par tous les sites et ton FAI voit ton trafic.'}</div>
+        <div class="privacy-note" style="margin-top:10px"><span>🔒</span><span>L'IP est affichée partiellement masquée. Ce test a contacté un service externe (ipify) uniquement pour cette vérification.</span></div>
+      </div>`;
+  };
+
+  body.querySelector('#hn-fix').onclick = async () => {
+    const ids = Array.from(body.querySelectorAll('input[data-fix]:checked')).map((i) => i.dataset.fix);
+    if (!ids.length) return toast('Aucune correction sélectionnée.', 'err');
+    if (ids.includes('upnp')) {
+      const preview = await window.api.homenetwork.previewUpnp();
+      const go = await confirmAction({
+        title: 'Désactiver UPnP',
+        desc: 'Les services UPnP (SSDP, Hôte de périphérique UPnP) seront arrêtés et désactivés. Droits admin requis.',
+        script: preview.script, elevated: true,
+      });
+      if (!go) return;
+      toast('Application… (UAC requis)');
+      const res = await window.api.homenetwork.disableUpnp();
+      toast(res.ok ? 'UPnP désactivé ✓' : 'Échec / annulé : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
+      if (res.ok) renderHomeNetwork();
+    }
+  };
+}
+
+// ---------- Vue : Diff post-Windows Update ----------
+async function renderSnapshot() {
+  container.innerHTML = `
+    <div class="view-head">
+      <span class="eyebrow">Suivi des mises à jour</span>
+      <h1>Diff post-Windows Update</h1>
+      <p>Windows réactive souvent des réglages de confidentialité après une mise à jour majeure. Enregistre un instantané de ton état actuel, puis compare après chaque MAJ pour repérer ce qui a été réactivé.</p>
+    </div>
+    <div id="snap-body">${loading('Chargement…')}</div>`;
+
+  const body = document.getElementById('snap-body');
+  const [snap, diff] = await Promise.all([window.api.snapshot.get(), window.api.snapshot.compare()]);
+
+  const buildLine = diff.hasPrevious
+    ? `${esc(diff.currentBuild.displayVersion)} · build ${esc(diff.currentBuild.build)}`
+    : '';
+
+  let diffHtml = '';
+  if (!diff.hasPrevious) {
+    diffHtml = '<div class="empty">Aucun instantané enregistré. Enregistre-en un maintenant pour pouvoir comparer après ta prochaine mise à jour Windows.</div>';
+  } else {
+    const buildBadge = diff.buildChanged
+      ? `<div class="privacy-note" style="background:var(--warn-bg);color:var(--warn);margin-bottom:14px"><span>🔄</span><span>Le build Windows a changé depuis l'instantané (${esc(diff.prevBuild.build)} → ${esc(diff.currentBuild.build)}). Une mise à jour a eu lieu.</span></div>`
+      : `<div class="privacy-note" style="background:var(--ok-bg);color:var(--ok);margin-bottom:14px"><span>✓</span><span>Même build Windows qu'à l'instantané (${esc(diff.currentBuild.build)}).</span></div>`;
+    const regHtml = diff.regressions.length
+      ? diff.regressions.map((r) => `
+        <div class="check">
+          <div class="check-status s-crit"></div>
+          <div class="check-body">
+            <div class="check-title">${esc(r.label)}</div>
+            <div class="check-meta"><span><b>Avant :</b> <span class="val-ok">${esc(r.before)}</span></span><span><b>Maintenant :</b> <span class="val-current">${esc(r.after)}</span></span></div>
+          </div>
+          <div class="check-side"><span class="pill pill-high">réactivé</span></div>
+        </div>`).join('')
+      : '<div class="privacy-note" style="background:var(--ok-bg);color:var(--ok)"><span>✓</span><span>Aucun réglage durci n\'a été réactivé depuis l\'instantané.</span></div>';
+    diffHtml = `${buildBadge}
+      <span class="eyebrow">Réglages réactivés (${diff.regressions.length})</span>
+      ${regHtml}
+      <p style="color:var(--text-faint);font-size:11.5px;margin-top:14px">Instantané du ${new Date(diff.prevTs).toLocaleString('fr-FR')}${diff.improvements.length ? ` · ${diff.improvements.length} réglage(s) améliorés depuis` : ''}.</p>`;
+  }
+
+  body.innerHTML = `
+    <div class="action-bar">
+      <button class="btn btn-accent btn-sm" id="snap-take">📸 Enregistrer un instantané maintenant</button>
+      ${snap ? `<span style="color:var(--text-dim);font-size:12px">Dernier : ${new Date(snap.ts).toLocaleString('fr-FR')}</span>` : ''}
+    </div>
+    ${buildLine ? `<p style="font-family:var(--mono);font-size:12px;color:var(--text-faint);margin-bottom:16px">Windows ${buildLine}</p>` : ''}
+    ${diffHtml}`;
+
+  body.querySelector('#snap-take').onclick = async () => {
+    toast('Enregistrement de l\'instantané…');
+    await window.api.snapshot.take();
+    toast('Instantané enregistré ✓', 'ok');
+    renderSnapshot();
+  };
+}
+
+// ---------- Vue : Surveillance (automatisation planifiée) ----------
+async function renderSchedule() {
+  container.innerHTML = `
+    <div class="view-head">
+      <span class="eyebrow">Automatisation</span>
+      <h1>Surveillance périodique</h1>
+      <p>Programme une analyse automatique récurrente. Si un réglage de confidentialité est réactivé (souvent après une mise à jour Windows), tu reçois une notification. ITWasher reste aussi accessible depuis la barre système.</p>
+    </div>
+    <div id="sch-body">${loading('Vérification de la tâche planifiée…')}</div>`;
+
+  const body = document.getElementById('sch-body');
+  const st = await window.api.schedule.status();
+
+  const freqLabel = { daily: 'quotidienne', weekly: 'hebdomadaire', monthly: 'mensuelle' };
+  body.innerHTML = `
+    <div class="guide">
+      <h3><span style="color:var(--accent)">⏰</span> État de la surveillance</h3>
+      <div class="g-detail">${st.exists
+        ? `Surveillance <b style="color:var(--ok)">active</b> — fréquence ${esc(freqLabel[st.frequency] || st.frequency)}, état : ${esc(st.state)}.`
+        : 'Aucune surveillance planifiée pour l\'instant.'}</div>
+      <div class="check-meta" style="margin-bottom:14px">
+        <span><b>Comment ça marche :</b> une tâche planifiée Windows lance ITWasher en arrière-plan et compare ton état à l'instantané enregistré. Notification uniquement en cas de régression.</span>
+      </div>
+      ${st.exists
+        ? `<button class="btn btn-sm" id="sch-remove">Désactiver la surveillance</button>`
+        : `<div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-accent" data-freq="weekly">Activer (hebdomadaire)</button>
+            <button class="btn btn-sm" data-freq="daily">Quotidienne</button>
+            <button class="btn btn-sm" data-freq="monthly">Mensuelle</button>
+          </div>`}
+    </div>
+    <div class="privacy-note"><span>ℹ️</span><span>La surveillance nécessite un instantané de référence (onglet « Diff post-Update »). Pense à en enregistrer un après avoir durci tes réglages.</span></div>`;
+
+  body.querySelectorAll('[data-freq]').forEach((btn) => {
+    btn.onclick = async () => {
+      toast('Création de la tâche planifiée…');
+      const res = await window.api.schedule.create(btn.dataset.freq);
+      toast(res.ok ? 'Surveillance activée ✓' : 'Échec : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
+      if (res.ok) renderSchedule();
+    };
+  });
+  const rm = body.querySelector('#sch-remove');
+  if (rm) rm.onclick = async () => {
+    const res = await window.api.schedule.remove();
+    toast(res.ok ? 'Surveillance désactivée ✓' : 'Échec : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
+    if (res.ok) renderSchedule();
+  };
+}
+
 // ---------- Boot ----------
 // Le bouton du rail « Tout auditer » relance une analyse complète immédiatement.
 document.getElementById('scanAll').addEventListener('click', async () => {
@@ -1031,6 +1232,15 @@ document.getElementById('scanAll').addEventListener('click', async () => {
   // Déclenche l'analyse (le rail est un raccourci explicite = clic utilisateur).
   await runFullAudit();
 });
+
+// Depuis le menu de la barre système : lancer une analyse.
+if (window.api.onTrayScan) {
+  window.api.onTrayScan(() => {
+    state.dashboardDone = false;
+    navigate('dashboard');
+    runFullAudit();
+  });
+}
 
 // Au démarrage : on affiche le tableau de bord en état INACTIF. Aucune analyse
 // n'est lancée tant que l'utilisateur ne clique pas sur un bouton.

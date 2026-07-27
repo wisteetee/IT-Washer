@@ -11,7 +11,24 @@ contextBridge.exposeInMainWorld('api', {
     windows11: () => ipcRenderer.invoke('audit:windows11'),
     accounts: () => ipcRenderer.invoke('audit:accounts'),
     startup: () => ipcRenderer.invoke('audit:startup'),
+    homenetwork: () => ipcRenderer.invoke('audit:homenetwork'),
   },
+  homenetwork: {
+    ipLeak: () => ipcRenderer.invoke('homenetwork:ipLeak'),
+    previewUpnp: () => ipcRenderer.invoke('homenetwork:previewUpnp'),
+    disableUpnp: () => ipcRenderer.invoke('homenetwork:disableUpnp'),
+  },
+  snapshot: {
+    get: () => ipcRenderer.invoke('snapshot:get'),
+    take: () => ipcRenderer.invoke('snapshot:take'),
+    compare: () => ipcRenderer.invoke('snapshot:compare'),
+  },
+  schedule: {
+    status: () => ipcRenderer.invoke('schedule:status'),
+    create: (frequency) => ipcRenderer.invoke('schedule:create', frequency),
+    remove: () => ipcRenderer.invoke('schedule:remove'),
+  },
+  onTrayScan: (cb) => ipcRenderer.on('tray:scan', cb),
   startup: {
     disableStartup: (names) => ipcRenderer.invoke('startup:disableStartup', names),
     disableTasks: (tasks) => ipcRenderer.invoke('startup:disableTasks', tasks),

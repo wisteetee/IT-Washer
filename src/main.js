@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Tray, Menu, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -12,6 +12,9 @@ const windows11 = require('./modules/windows11');
 const accounts = require('./modules/accounts');
 const startup = require('./modules/startup');
 const exif = require('./modules/exif');
+const homenetwork = require('./modules/homenetwork');
+const snapshot = require('./modules/snapshot');
+const schedule = require('./modules/schedule');
 const profiles = require('./modules/profiles');
 const restore = require('./restore');
 const rollback = require('./rollback');
@@ -19,7 +22,11 @@ const store = require('./store');
 const report = require('./report');
 const { runPowerShell, runPowerShellElevated } = require('./ps');
 
+// Mode surveillance : lancé par la tâche planifiée avec --scan (pas d'UI).
+const isScanMode = process.argv.includes('--scan');
+
 let win;
+let tray = null;
 
 function createWindow() {
   win = new BrowserWindow({
@@ -40,9 +47,61 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
-app.whenReady().then(createWindow);
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+app.whenReady().then(() => {
+  if (isScanMode) {
+    // Mode surveillance en tâche de fond : audit silencieux, notification si
+    // régression détectée, puis fermeture. Pas de fenêtre.
+    runBackgroundScan().finally(() => app.quit());
+    return;
+  }
+  createWindow();
+  setupTray();
+});
+app.on('window-all-closed', () => {
+  // Si le tray est actif, on garde l'app en vie en arrière-plan.
+  if (tray) return;
+  if (process.platform !== 'darwin') app.quit();
+});
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+
+// Icône dans la barre système : accès rapide + garde l'app en veille.
+function setupTray() {
+  try {
+    const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
+    tray = new Tray(iconPath);
+    tray.setToolTip('ITWasher — hygiène informatique');
+    const menu = Menu.buildFromTemplate([
+      { label: 'Ouvrir ITWasher', click: () => { if (win) { win.show(); win.focus(); } else createWindow(); } },
+      { label: 'Lancer une analyse', click: () => { if (win) { win.show(); win.webContents.send('tray:scan'); } } },
+      { type: 'separator' },
+      { label: 'Quitter', click: () => { tray.destroy(); tray = null; app.quit(); } },
+    ]);
+    tray.setContextMenu(menu);
+    tray.on('double-click', () => { if (win) { win.show(); win.focus(); } else createWindow(); });
+  } catch (_) { tray = null; }
+}
+
+// Scan silencieux (mode --scan) : compare à l'instantané et notifie si régression.
+async function runBackgroundScan() {
+  try {
+    const diff = await snapshot.compare();
+    let title, body;
+    if (diff.hasPrevious && diff.regressions.length > 0) {
+      title = '⚠ ITWasher — réglages réactivés';
+      const changed = diff.buildChanged ? ' (après une mise à jour Windows)' : '';
+      body = `${diff.regressions.length} réglage(s) de confidentialité ont été réactivés${changed}. Ouvre ITWasher pour corriger.`;
+    } else if (diff.buildChanged) {
+      title = 'ITWasher — mise à jour Windows détectée';
+      body = 'Aucune régression de confidentialité détectée. 👍';
+    } else {
+      // Rien à signaler : on reste discret (pas de notif).
+      return;
+    }
+    if (Notification.isSupported()) {
+      new Notification({ title, body }).show();
+    }
+  } catch (_) { /* silencieux */ }
+}
 
 // ---- Audit (lecture seule) ----
 ipcMain.handle('audit:telemetry', () => telemetry.audit());
@@ -52,7 +111,32 @@ ipcMain.handle('audit:network', () => network.audit());
 ipcMain.handle('audit:windows11', () => windows11.audit());
 ipcMain.handle('audit:accounts', () => accounts.audit());
 ipcMain.handle('audit:startup', () => startup.audit());
+ipcMain.handle('audit:homenetwork', () => homenetwork.audit());
 ipcMain.handle('restore:status', () => restore.restoreStatus());
+
+// ---- Réseau domestique : test de fuite d'IP + désactivation UPnP ----
+ipcMain.handle('homenetwork:ipLeak', () => homenetwork.ipLeakTest());
+ipcMain.handle('homenetwork:previewUpnp', () => homenetwork.buildDisableUpnp());
+ipcMain.handle('homenetwork:disableUpnp', () => {
+  const { script, needsElevation } = homenetwork.buildDisableUpnp();
+  return needsElevation ? runPowerShellElevated(script) : runPowerShell(script);
+});
+
+// ---- Diff post-Windows Update ----
+ipcMain.handle('snapshot:get', () => snapshot.getSnapshot());
+ipcMain.handle('snapshot:take', () => snapshot.takeSnapshot());
+ipcMain.handle('snapshot:compare', () => snapshot.compare());
+
+// ---- Automatisation planifiée ----
+ipcMain.handle('schedule:status', () => schedule.status());
+ipcMain.handle('schedule:create', (_e, frequency) => {
+  const { script } = schedule.buildCreate(frequency, process.execPath);
+  return runPowerShell(script);
+});
+ipcMain.handle('schedule:remove', () => {
+  const { script } = schedule.buildRemove();
+  return runPowerShell(script);
+});
 
 // ---- Démarrage & services : désactivations ciblées ----
 ipcMain.handle('startup:disableStartup', (_e, names) => {
