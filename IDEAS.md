@@ -22,6 +22,13 @@ Légende faisabilité : 🟢 auto fiable · 🟡 auto avec réserves · 🔵 aud
 - **Module Métadonnées photos (EXIF GPS)** — `exif.js`, vue dédiée : scan récursif d'un dossier (System.Drawing), détection GPS, effacement en un clic (réécriture atomique). Scan+strip testés.
 - **Rebranding** — titre fenêtre + brand = ITWasher.
 
+### 5e vague — idées reprises de WinUtil (2026-07-27)
+Analyse de [WinUtil de Chris Titus](https://christitus.com/winutil-in-2026/) (30M+ exécutions, 4 onglets Install/Tweaks/Config/Updates). Idées récupérées :
+- **Installer des apps** (`appstore.js`, vue dédiée) — catalogue de 21 alternatives libres/respectueuses en 6 catégories, installation/désinstallation en 1 clic via **Winget**. Détection croisée (ID winget + nom) car une app peut venir du Store. Ferme la boucle avec l'audit Applications : « remplace Chrome » → « installe Brave ». Champ « Remplace : … » sur chaque app. Testé (winget v1.29.280, 6/21 détectées installées).
+- **Contrôle des mises à jour** (`windowsupdate.js`, vue dédiée) — pause 7/14/35 jours (toutes éditions), report des mises à niveau majeures (Pro uniquement, **signalé honnêtement comme indisponible sur Famille**), date de la dernière MAJ. Philosophie : contrôler le *calendrier*, jamais désactiver la sécurité.
+
+**Écarté volontairement de WinUtil** : Win11 Creator (ISO custom — trop lourd/risqué), débloat agressif de services (~70-80 processus — le module Démarrage & services confirmé-par-clic est plus sûr), onglet Config (raccourcis panneaux — faible valeur ajoutée). Les outils de réparation (SFC/DISM/reset réseau) restent une piste ouverte.
+
 ### 4e vague — reprise de contrôle (2026-07-27)
 - **Centre de démarches** (`procedures.js`, vue phare en 2e position du rail) : 14 parcours guidés en 4 catégories (vie privée & données, publicité & tracking, comptes & effacement, anti-démarchage). Chaque démarche = titre motivant, « pourquoi », temps estimé, badge d'impact, étapes repliables, bouton « Commencer » vers un portail officiel vérifié (CNIL, Bloctel, Google/Meta/Microsoft, Utiq, JustDeleteMe, HIBP, Bitwarden…). Suivi de progression persisté (`procedures-progress.json`) avec anneau + messages motivants.
 - **Blocage de publicités** (`adblock.js`, vue dédiée) : blocage niveau système via fichier hosts (liste StevenBlack ~93k domaines, section délimitée par marqueurs, sauvegarde hosts avant modif, réversible, flushdns). + guide navigateur (uBlock Origin, Privacy Badger, Firefox/LibreWolf). URLs et fetch testés.

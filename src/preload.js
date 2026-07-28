@@ -13,6 +13,19 @@ contextBridge.exposeInMainWorld('api', {
     startup: () => ipcRenderer.invoke('audit:startup'),
     homenetwork: () => ipcRenderer.invoke('audit:homenetwork'),
     adblock: () => ipcRenderer.invoke('audit:adblock'),
+    appstore: () => ipcRenderer.invoke('audit:appstore'),
+    windowsupdate: () => ipcRenderer.invoke('audit:windowsupdate'),
+  },
+  appstore: {
+    previewInstall: (ids) => ipcRenderer.invoke('appstore:previewInstall', ids),
+    install: (ids) => ipcRenderer.invoke('appstore:install', ids),
+    uninstall: (ids) => ipcRenderer.invoke('appstore:uninstall', ids),
+  },
+  wupdate: {
+    previewPause: (days) => ipcRenderer.invoke('wupdate:previewPause', days),
+    pause: (days) => ipcRenderer.invoke('wupdate:pause', days),
+    resume: () => ipcRenderer.invoke('wupdate:resume'),
+    defer: (days) => ipcRenderer.invoke('wupdate:defer', days),
   },
   procedures: {
     list: () => ipcRenderer.invoke('procedures:list'),

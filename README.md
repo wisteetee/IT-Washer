@@ -39,6 +39,8 @@ Génère un dossier autonome `dist/ITWasher-win32-x64/` contenant `ITWasher.exe`
 | **Télémétrie Windows** | Durcit : niveau de télémétrie, ID publicitaire, historique d'activités, Cortana, pubs Démarrer, suivi d'usage, localisation, Wi-Fi Sense. Réversible. |
 | **Nouveautés Windows 11** | Recall (capture IA), Copilot, Widgets, presse-papiers cloud/historique. |
 | **Applications** | Liste les apps installées, signale les intrusives (Chrome→Brave, CCleaner, Avast…) et le bloatware (désinstallable en un clic). |
+| **Installer des apps** | Catalogue de 21 alternatives libres et respectueuses (navigateurs, gestionnaires de mots de passe, bureautique…), installées en un clic via Winget. |
+| **Mises à jour** | Met les mises à jour en pause (7 à 35 jours) pour choisir ton moment, sans jamais désactiver la sécurité durablement. |
 | **Démarrage & services** | Programmes au démarrage, tâches planifiées et services non-Microsoft, surface d'attaque (RDP, SMBv1, partages). |
 | **Navigateurs & consentements** | Navigateurs détectés, réglages anti-tracking, checklist guidée (Utiq, Google/Microsoft Ads, Your Online Choices). |
 | **Fuites de données** | Vérifie si un mot de passe a fuité via Pwned Passwords (k-anonymity). |

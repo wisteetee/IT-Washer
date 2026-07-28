@@ -17,6 +17,8 @@ const snapshot = require('./modules/snapshot');
 const schedule = require('./modules/schedule');
 const procedures = require('./modules/procedures');
 const adblock = require('./modules/adblock');
+const appstore = require('./modules/appstore');
+const windowsupdate = require('./modules/windowsupdate');
 const profiles = require('./modules/profiles');
 const restore = require('./restore');
 const rollback = require('./rollback');
@@ -115,7 +117,38 @@ ipcMain.handle('audit:accounts', () => accounts.audit());
 ipcMain.handle('audit:startup', () => startup.audit());
 ipcMain.handle('audit:homenetwork', () => homenetwork.audit());
 ipcMain.handle('audit:adblock', () => adblock.audit());
+ipcMain.handle('audit:appstore', () => appstore.audit());
+ipcMain.handle('audit:windowsupdate', () => windowsupdate.audit());
 ipcMain.handle('restore:status', () => restore.restoreStatus());
+
+// ---- Installation d'applications (Winget) ----
+ipcMain.handle('appstore:previewInstall', (_e, ids) => appstore.buildInstall(ids));
+ipcMain.handle('appstore:install', (_e, ids) => {
+  const { script } = appstore.buildInstall(ids);
+  if (!script.trim()) return { ok: false, stderr: 'Aucune application sélectionnée.' };
+  // Winget peut être long (téléchargement) : timeout généreux.
+  return runPowerShellElevated(script, { timeout: 900000 });
+});
+ipcMain.handle('appstore:uninstall', (_e, ids) => {
+  const { script } = appstore.buildUninstall(ids);
+  if (!script.trim()) return { ok: false, stderr: 'Aucune application sélectionnée.' };
+  return runPowerShellElevated(script, { timeout: 600000 });
+});
+
+// ---- Contrôle des mises à jour Windows ----
+ipcMain.handle('wupdate:previewPause', (_e, days) => windowsupdate.buildPause(days));
+ipcMain.handle('wupdate:pause', (_e, days) => {
+  const { script } = windowsupdate.buildPause(days);
+  return runPowerShellElevated(script);
+});
+ipcMain.handle('wupdate:resume', () => {
+  const { script } = windowsupdate.buildResume();
+  return runPowerShellElevated(script);
+});
+ipcMain.handle('wupdate:defer', (_e, days) => {
+  const { script } = windowsupdate.buildDefer(days);
+  return runPowerShellElevated(script);
+});
 
 // ---- Centre de démarches ----
 ipcMain.handle('procedures:list', () => procedures.list());

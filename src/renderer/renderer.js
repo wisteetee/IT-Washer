@@ -58,6 +58,7 @@ const views = {
   telemetry: renderTelemetry,
   windows11: renderWindows11,
   apps: renderApps,
+  appstore: renderAppStore,
   startup: renderStartup,
   browsers: renderBrowsers,
   adblock: renderAdblock,
@@ -66,6 +67,7 @@ const views = {
   network: renderNetwork,
   homenetwork: renderHomeNetwork,
   accounts: renderAccounts,
+  windowsupdate: renderWindowsUpdate,
   snapshot: renderSnapshot,
   schedule: renderSchedule,
   history: renderHistory,
@@ -1376,6 +1378,179 @@ async function renderAdblock() {
     const res = await window.api.adblock.remove();
     toast(res.ok ? 'Blocage désactivé ✓' : 'Échec / annulé : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
     if (res.ok) renderAdblock();
+  };
+}
+
+// ---------- Vue : Installer des apps (Winget) ----------
+async function renderAppStore() {
+  container.innerHTML = `
+    <div class="view-head">
+      <span class="eyebrow">Alternatives respectueuses</span>
+      <h1>Installer des apps</h1>
+      <p>Installe en un clic des logiciels libres ou respectueux de la vie privée, via Winget (le gestionnaire de paquets intégré à Windows). Coche ce que tu veux, puis installe.</p>
+    </div>
+    <div id="as-body">${loading('Vérification de Winget et des apps installées…')}</div>`;
+
+  const data = await window.api.audit.appstore();
+  const body = document.getElementById('as-body');
+
+  if (!data.available) {
+    body.innerHTML = `<div class="privacy-note" style="background:var(--warn-bg);color:var(--warn)"><span>⚠</span><span>Winget n'est pas disponible sur ce système. Il est fourni avec « Programme d'installation d'application » depuis le Microsoft Store.</span></div>`;
+    return;
+  }
+
+  const installedCount = data.apps.filter((a) => a.installed).length;
+  body.innerHTML = `
+    <div class="action-bar">
+      <button class="btn btn-accent btn-sm" id="as-install">Installer la sélection</button>
+      <button class="btn btn-sm" id="as-uninstall">Désinstaller la sélection</button>
+      <span style="flex:1"></span>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--text-faint)">winget ${esc(data.wingetVersion)} · ${installedCount}/${data.apps.length} déjà installées</span>
+    </div>
+    <input type="text" class="list-filter" id="as-filter" placeholder="🔍 Filtrer par nom ou description…" autocomplete="off">
+    <div id="as-list">
+    ${data.categories.map((cat) => {
+      const apps = data.apps.filter((a) => a.cat === cat);
+      return `
+        <div class="as-cat" data-cat="${esc(cat)}" style="margin-bottom:22px">
+          <span class="eyebrow" style="font-size:11.5px">${esc(cat)}</span>
+          ${apps.map((a) => `
+            <div class="check as-app" data-search="${esc((a.name + ' ' + a.detail + ' ' + (a.replaces || '')).toLowerCase())}">
+              <div class="check-status ${a.installed ? 's-ok' : 's-warn'}"></div>
+              <div class="check-body">
+                <div class="check-title">${esc(a.name)} ${a.installed ? '<span style="color:var(--ok);font-size:11px;font-family:var(--mono)">✓ installé</span>' : ''}</div>
+                <div class="check-detail">${esc(a.detail)}</div>
+                ${a.replaces ? `<div class="check-meta"><span><b>Remplace :</b> ${esc(a.replaces)}</span></div>` : ''}
+              </div>
+              <div class="check-side">
+                <label class="chk"><input type="checkbox" data-app="${esc(a.id)}"><span>${a.installed ? 'sélectionner' : 'installer'}</span></label>
+              </div>
+            </div>`).join('')}
+        </div>`;
+    }).join('')}
+    </div>`;
+
+  // Filtre live.
+  const filter = body.querySelector('#as-filter');
+  filter.addEventListener('input', () => {
+    const q = filter.value.trim().toLowerCase();
+    body.querySelectorAll('.as-app').forEach((el) => {
+      el.style.display = !q || el.dataset.search.includes(q) ? '' : 'none';
+    });
+    // Masque les catégories devenues vides.
+    body.querySelectorAll('.as-cat').forEach((cat) => {
+      const visible = Array.from(cat.querySelectorAll('.as-app')).some((a) => a.style.display !== 'none');
+      cat.style.display = visible ? '' : 'none';
+    });
+  });
+
+  const selected = () => Array.from(body.querySelectorAll('input[data-app]:checked')).map((i) => i.dataset.app);
+
+  body.querySelector('#as-install').onclick = async () => {
+    const ids = selected();
+    if (!ids.length) return toast('Aucune application sélectionnée.', 'err');
+    const preview = await window.api.appstore.previewInstall(ids);
+    const go = await confirmAction({
+      title: 'Installer des applications',
+      desc: `${ids.length} application(s) seront installées via Winget. Le téléchargement peut prendre plusieurs minutes. Droits admin requis.`,
+      script: preview.script, elevated: true,
+    });
+    if (!go) return;
+    toast('Installation en cours… (peut prendre plusieurs minutes)');
+    const res = await window.api.appstore.install(ids);
+    toast(res.ok ? 'Installation terminée ✓' : 'Échec / annulé : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
+    if (res.ok) renderAppStore();
+  };
+
+  body.querySelector('#as-uninstall').onclick = async () => {
+    const ids = selected();
+    if (!ids.length) return toast('Aucune application sélectionnée.', 'err');
+    const go = await confirmAction({
+      title: 'Désinstaller des applications',
+      desc: `${ids.length} application(s) seront désinstallées via Winget. Droits admin requis.`,
+      script: ids.map((i) => `winget uninstall --id '${i}' --exact --silent`).join('\n'),
+      elevated: true,
+    });
+    if (!go) return;
+    toast('Désinstallation en cours…');
+    const res = await window.api.appstore.uninstall(ids);
+    toast(res.ok ? 'Désinstallation terminée ✓' : 'Échec / annulé : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
+    if (res.ok) renderAppStore();
+  };
+}
+
+// ---------- Vue : Contrôle des mises à jour ----------
+async function renderWindowsUpdate() {
+  container.innerHTML = `
+    <div class="view-head">
+      <span class="eyebrow">Garder le contrôle</span>
+      <h1>Mises à jour Windows</h1>
+      <p>Choisis <b>quand</b> les mises à jour s'installent, sans jamais renoncer à la sécurité. La pause est temporaire et la protection reprend automatiquement.</p>
+    </div>
+    <div id="wu-body">${loading('Lecture de la configuration…')}</div>`;
+
+  const data = await window.api.audit.windowsupdate();
+  const body = document.getElementById('wu-body');
+
+  body.innerHTML = `
+    <p style="font-family:var(--mono);font-size:11.5px;color:var(--text-faint);margin-bottom:16px">${esc(data.edition)}</p>
+
+    <div class="guide">
+      <h3><span style="color:var(--accent)">⏸</span> Mettre les mises à jour en pause</h3>
+      <div class="g-detail">${data.pausedUntil
+        ? `Mises à jour <b style="color:var(--warn)">en pause</b> jusqu'au ${esc(data.pausedUntil)}.`
+        : 'Les mises à jour sont actives. Tu peux les suspendre jusqu\'à 5 semaines pour choisir ton moment.'}</div>
+      <div class="privacy-note" style="margin-bottom:14px"><span>ℹ️</span><span>La pause est <b>temporaire par conception</b> : Windows réactive les mises à jour à l'échéance. C'est volontaire — désactiver durablement les correctifs de sécurité serait dangereux.</span></div>
+      ${data.pausedUntil
+        ? `<button class="btn btn-sm btn-accent" id="wu-resume">Reprendre les mises à jour</button>`
+        : `<div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-accent" data-pause="7">Pause 7 jours</button>
+            <button class="btn btn-sm" data-pause="14">14 jours</button>
+            <button class="btn btn-sm" data-pause="35">5 semaines (max)</button>
+          </div>`}
+    </div>
+
+    ${data.checks.map((c) => `
+      <div class="check">
+        <div class="check-status ${c.status === 'ok' ? 's-ok' : c.status === 'info' ? 's-ok' : 's-warn'}"></div>
+        <div class="check-body">
+          <div class="check-title">${esc(c.label)}</div>
+          <div class="check-detail">${esc(c.detail)}</div>
+          <div class="check-meta"><span><b>État :</b> <span class="${c.status === 'ok' ? 'val-ok' : ''}">${esc(c.current)}</span></span></div>
+        </div>
+        <div class="check-side">
+          ${c.unavailable ? '<span class="pill" style="color:var(--text-faint)">édition Famille</span>' : (c.readOnly ? '<span style="color:var(--text-faint);font-size:11px">info</span>' : '')}
+        </div>
+      </div>`).join('')}`;
+
+  body.querySelectorAll('[data-pause]').forEach((btn) => {
+    btn.onclick = async () => {
+      const days = btn.dataset.pause;
+      const preview = await window.api.wupdate.previewPause(days);
+      const go = await confirmAction({
+        title: `Mettre les mises à jour en pause (${days} jours)`,
+        desc: 'Les mises à jour reprendront automatiquement à l\'échéance. Droits admin requis.',
+        script: preview.script, elevated: true,
+      });
+      if (!go) return;
+      toast('Application… (UAC requis)');
+      const res = await window.api.wupdate.pause(days);
+      toast(res.ok ? `Mises à jour en pause ${days} jours ✓` : 'Échec / annulé : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
+      if (res.ok) renderWindowsUpdate();
+    };
+  });
+
+  const resumeBtn = body.querySelector('#wu-resume');
+  if (resumeBtn) resumeBtn.onclick = async () => {
+    const go = await confirmAction({
+      title: 'Reprendre les mises à jour',
+      desc: 'La pause sera levée et Windows reprendra ses mises à jour normalement.',
+      script: 'Retire les clés de pause du registre.', elevated: true,
+    });
+    if (!go) return;
+    const res = await window.api.wupdate.resume();
+    toast(res.ok ? 'Mises à jour réactivées ✓' : 'Échec / annulé : ' + (res.stderr || ''), res.ok ? 'ok' : 'err');
+    if (res.ok) renderWindowsUpdate();
   };
 }
 
